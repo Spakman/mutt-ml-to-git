@@ -92,7 +92,7 @@ puts
 
 if filepath.empty?
   puts "The filepath to the cached email appears to be empty. Boo."
-  exit -1
+  exit 1
 end
 
 puts "  This email is cached:"
