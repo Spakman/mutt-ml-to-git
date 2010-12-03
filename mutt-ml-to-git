@@ -1,0 +1,133 @@
+#!/usr/bin/env ruby
+#
+# A quick thing I put together to make applying patches from a project mailing
+# list folder in Mutt easy. This script could certainly be modified to
+# be a bit smarter and more generic.
+#
+# I currently run Mutt as an IMAP client and have local header and body
+# caching turned out. This script takes advantage of that.
+#
+# In my .muttrc, I added a macro to call the program (you might want to
+# look at the wait_key variable too):
+#
+#   macro pager "P" "<pipe-message>/path/to/mutt-ml-to-git<enter>"
+# 
+#
+# 
+# Originally by Mark Somerville <mark@scottishclimbs.com>, but the license is
+# below:
+#
+#
+#            DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE
+#                    Version 2, December 2004
+#
+# Copyright (C) 2004 Sam Hocevar <sam@hocevar.net>
+#
+# Everyone is permitted to copy and distribute verbatim or modified
+# copies of this license document, and changing it is allowed as long
+# as the name is changed.
+#
+#            DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE
+#   TERMS AND CONDITIONS FOR COPYING, DISTRIBUTION AND MODIFICATION
+#
+#  0. You just DO WHAT THE FUCK YOU WANT TO.
+
+
+
+# Just for display purposes.
+PROJECT_NAME = "coolproject"
+
+# The path to the checked out repo.
+PROJECT_PATH = "/path/to/coolproject/"
+
+# The directory path where Mutt caches your mailing list folder.
+PROJECT_FOLDER_CACHE_PATH = "/path/to/imap/folder/cache/for/coolproject/"
+
+# This is the shell colour the branch name is displayed in. You don't need to
+# add the reset code, it's always passed in the current_branch method.
+#
+# Empty or nil for no colour. This one is a nice bright green.
+BRANCH_COLOUR = "\e[1;32m"
+
+
+require "pathname"
+
+def current_branch
+  branches = `git branch`.chomp
+  branch = branches[/^\* \(?(.+?)\)?$/m, 1]
+  "#{BRANCH_COLOUR}#{branch}\e[0m"
+end
+
+def message_id
+  message_id = STDIN.read[/^Message-Id: ?.+?$/im].chomp
+end
+
+def filepath
+  @filepath ||= `grep -lr "#{message_id}" #{PROJECT_FOLDER_CACHE_PATH}`.chomp
+end
+
+# We need to get control of STDIN again.
+def with_new_stdin
+  old_stdin = STDIN.dup
+
+  path = Pathname.new("/dev/fd/#{STDOUT.fileno}").realpath
+  new_stdin = File.new(path, "w+")
+  STDIN.reopen(new_stdin)
+
+  yield
+
+  STDIN.reopen old_stdin
+
+  new_stdin.close
+  old_stdin.close
+end
+
+
+Dir.chdir PROJECT_PATH
+
+puts
+puts
+puts "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+puts
+
+if filepath.empty?
+  puts "The filepath to the cached email appears to be empty. Boo."
+  exit -1
+end
+
+puts "  This email is cached:"
+puts
+puts "  #{filepath}"
+puts
+
+with_new_stdin do
+  print "  Apply it as a patch to #{PROJECT_NAME} (current branch: #{current_branch}) [y/N]: "
+  STDOUT.flush
+  answer = gets.chomp
+  puts
+
+  if answer.chomp.downcase == "y"
+
+    puts "-----"
+    puts
+
+    # Just forking for vanity reasons (so we can put some newlines after
+    # the exec!
+    pid = fork do
+      puts "`git am #{filepath}`:"
+      puts
+      exec "git am #{filepath}"
+    end
+    Process.wait pid
+
+    puts
+    puts "-----"
+
+  else
+    puts "  Cancelled."
+  end
+
+end
+
+puts
+exit 0
