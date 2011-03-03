@@ -5,7 +5,7 @@
 # be a bit smarter and more generic.
 #
 # I currently run Mutt as an IMAP client and have local header and body
-# caching turned out. This script takes advantage of that.
+# caching turned on. This script takes advantage of that.
 #
 # In my .muttrc, I added a macro to call the program (you might want to
 # look at the wait_key variable too):
@@ -21,13 +21,6 @@
 #            DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE
 #                    Version 2, December 2004
 #
-# Copyright (C) 2004 Sam Hocevar <sam@hocevar.net>
-#
-# Everyone is permitted to copy and distribute verbatim or modified
-# copies of this license document, and changing it is allowed as long
-# as the name is changed.
-#
-#            DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE
 #   TERMS AND CONDITIONS FOR COPYING, DISTRIBUTION AND MODIFICATION
 #
 #  0. You just DO WHAT THE FUCK YOU WANT TO.
@@ -63,7 +56,7 @@ def message_id
 end
 
 def filepath
-  @filepath ||= `grep -lr "#{message_id}" #{PROJECT_FOLDER_CACHE_PATH}`.chomp
+  @filepath ||= `grep -lr "#{message_id}" #{PROJECT_FOLDER_CACHE_PATH}`.lines.first.chomp
 end
 
 # We need to get control of STDIN again.
@@ -110,16 +103,9 @@ with_new_stdin do
 
     puts "-----"
     puts
-
-    # Just forking for vanity reasons (so we can put some newlines after
-    # the exec!
-    pid = fork do
-      puts "`git am #{filepath}`:"
-      puts
-      exec "git am #{filepath}"
-    end
-    Process.wait pid
-
+    puts "`git am -3 #{filepath}`:"
+    puts
+    system "git am -3 #{filepath}"
     puts
     puts "-----"
 
